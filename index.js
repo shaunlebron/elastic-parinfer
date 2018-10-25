@@ -5,7 +5,8 @@
 const state = {
   cursor: { i: 0, x: 0, y: 0, xMax: 0, t: 0 },
   cam: { x: 0, y: 0, w: 0, h: 0 },
-  text: ""
+  text: "",
+  disp: "" // FIXME: set this from expandElasticChars(text) after each change
 };
 
 //------------------------------------------------------------------------------
@@ -118,8 +119,7 @@ function updateCamera() {
 }
 
 //------------------------------------------------------------------------------
-// Coordinates
-// (2D <> 1D)
+// Text Coordinates (2D <> 1D)
 //------------------------------------------------------------------------------
 
 function getCursorXY({ text, i }) {
@@ -131,6 +131,29 @@ function getCursorXY({ text, i }) {
 
 function getCursorI({ lines, x, y }) {
   return x + lines.slice(0, y).reduce((i, line) => i + line.length + 1, 0);
+}
+
+//------------------------------------------------------------------------------
+// Display<>Text Coordinates
+// (1-to-1 if not for elastic characters)
+//------------------------------------------------------------------------------
+
+function displayToTextCol({ disp, text, x, y }) {
+  const cells = text.split("\n")[y].split(delim);
+  const eCells = disp.split("\n")[y].slice(0, x).split(delim); // prettier-ignore
+  const n = eCells.length;
+  // FIXME: eCells have delims stripped, so `w` will be off by -1 for each cell index > 1
+  const w = range(n - 1).reduce((w, x) => w + cells[x].length, 0);
+  return w + Math.min(eCells[n - 1].length, cells[n - 1].length);
+}
+
+function textToDisplayCol({ disp, text, x, y }) {
+  const eCells = disp.split("\n")[y].split(delim);
+  const cells = text.split("\n")[y].slice(0, x).split(delim); // prettier-ignore
+  const n = cells.length;
+  // FIXME: cells have delims stripped, so `w` will be off by -1 for each cell index > 1
+  const w = range(n - 1).reduce((w, x) => w + eCells[x].length, 0);
+  return w + cells[n - 1].length;
 }
 
 //------------------------------------------------------------------------------
@@ -233,9 +256,8 @@ function computeElasticBlocks(text, delim) {
   const table = text.split("\n").map(line => line.split(delim).slice(0, -1));
 
   // result objects
-  const tableUnpruned = text.split("\n").map(line => line.split(delim));
-  const cellBlocks = {}; // map a cell coordinate `${row},${col}` to a block index
-  const blockWidths = []; // map a block index to a width
+  const blocks = range(table.length).map(() => []);
+  const widths = []; // map a block index to a width
 
   // cells by coordinate
   const numRows = table.length;
@@ -249,25 +271,33 @@ function computeElasticBlocks(text, delim) {
       .map(r => getCell(r, c))
       .filter(({ text }) => text != null);
 
-    // Group contiguous cells into blocks.
-    const blocks = splitArray(column, (curr, prev) => curr.r !== prev.r + 1);
+    // Group contiguous cells.
+    const groups = splitArray(column, (curr, prev) => curr.r !== prev.r + 1);
 
     // process each block
-    for (const cells of blocks) {
-      // compute block width
-      const w = Math.max(...cells.map(({ text }) => text.length));
-      // create a new index to identify this block
-      const blockI = blockWidths.length;
-      // associate each of our cell coordinates to this block
-      for (const { r } of cells) {
-        cellBlocks[`${r},${c}`] = blockI;
-      }
-      // store the width of the block
-      blockWidths.push(w);
+    for (const cells of groups) {
+      const w = Math.max(...cells.map(cell => cell.text.length));
+      const i = widths.length;
+      for (const { r } of cells) blocks[r].push(i);
+      widths.push(w);
     }
   }
+  return { blocks, widths };
+}
 
-  return { table: tableUnpruned, cellBlocks, blockWidths };
+// View the given text with the elastic tabs expanded into spaces.
+function expandElasticChars(text, delim) {
+  const { blocks, widths } = computeElasticTabs(text, delim);
+  const expandCell = (r, c) =>
+    // FIXME: text has delim prefix stripped when when c = 0
+    table[r][c].padEnd(widths[blocks[r][c]]);
+  const numRows = table.length;
+  const numCols = r => table[r].length;
+  const lines = range(numRows).map(r => {
+    const cells = range(numCols(r)).map(c => expandCell(r, c));
+    return cells.join("");
+  });
+  return lines.join("\n");
 }
 
 //------------------------------------------------------------------------------
