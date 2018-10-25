@@ -42,7 +42,7 @@ const fontColor = "#eee";
 const delimColor = "#555";
 const margin = 50;
 const fontFamily = "Menlo, monospace";
-const fontSize = 40;
+const fontSize = 32;
 const charSize = { w: null, h: fontSize * 1.2 };
 
 function computeCharWidth(ctx) {
