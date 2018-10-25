@@ -17,6 +17,22 @@ const state = {
   displayCursor: { x: 0, xMax: 0 }
 };
 
+const initialText = `(|defn foo
+ | "hello, this is a docstring"
+ | [a b]
+ | (|let [sum (+ a b)
+ |  |     prod (* a b)]
+ |  |
+ |  |  {|:sum sum
+ |  |   |:prod prod}))
+
+(foo |bar
+     |baz)
+
+(|foo bar
+ |baz)
+`;
+
 //------------------------------------------------------------------------------
 // Typography
 //------------------------------------------------------------------------------
@@ -123,10 +139,11 @@ function updateCamera() {
 
 function updateText(text) {
   const displayText = expandElasticChars(text);
+  console.log(displayText);
 
   state.text = text;
   state.lines = text.split("\n");
-  state.diplayText = displayText;
+  state.displayText = displayText;
   state.displayLines = displayText.split("\n");
 }
 
@@ -220,7 +237,6 @@ function onKey(e) {
     if (e.key === "Backspace") edit(i - 1, i, "");
     if (e.key === "Delete") edit(i, i + 1, "");
   }
-  updateCamera();
   draw();
 }
 
@@ -229,6 +245,7 @@ function onKey(e) {
 //------------------------------------------------------------------------------
 
 function draw() {
+  updateCamera();
   const { displayLines, displayCursor, cursor, cam } = state;
 
   ctx.save();
@@ -318,6 +335,7 @@ function expandElasticChars(text) {
 //------------------------------------------------------------------------------
 
 function init() {
+  updateText(initialText);
   initCanvas();
   document.addEventListener("keydown", onKey);
   tick();
