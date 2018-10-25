@@ -2,12 +2,30 @@
 // State
 //------------------------------------------------------------------------------
 
+const elasticDelim = "|";
+
 const state = {
+  // FIXME: replace xMax with displayCursor.xMax
   cursor: { i: 0, x: 0, y: 0, xMax: 0, t: 0 },
   cam: { x: 0, y: 0, w: 0, h: 0 },
   text: "",
-  disp: "" // FIXME: set this from expandElasticChars(text) after each change
+
+  // derived from text
+  lines: [""],
+  displayText: "",
+  displayLines: [""],
+  displayCursor: { x: 0, xMax: 0 }
 };
+
+function deriveState() {
+  const { text } = state;
+  const displayText = expandElasticChars(text, elasticDelim);
+
+  state.lines = text.split("\n");
+  state.diplayText = displayText;
+  state.displayLines = displayText.split("\n");
+  // TODO: state.displayCursor
+}
 
 //------------------------------------------------------------------------------
 // Typography
@@ -38,23 +56,15 @@ function clamp(val, min, max) {
 function range(start, stop, step = 1) {
   if (stop === undefined) [start, stop] = [0, start];
   const result = [];
-  for (let i = start; i < stop; i += step) {
-    result.push(i);
-  }
+  for (let i = start; i < stop; i += step) result.push(i);
   return result;
 }
 
 function splitArray(array, shouldSplit) {
   const n = array.length;
   if (n === 0) return [];
-
-  // get each position in the array where a split should occur
   let indexes = range(1, n).filter(i => shouldSplit(array[i], array[i - 1]));
-
-  // insert start/end points
   indexes = [0, ...indexes, n];
-
-  // group elements between the indexes
   return range(0, indexes.length - 1).map(i =>
     array.slice(indexes[i], indexes[i + 1])
   );
@@ -138,22 +148,24 @@ function getCursorI({ lines, x, y }) {
 // (1-to-1 if not for elastic characters)
 //------------------------------------------------------------------------------
 
-function displayToTextCol({ disp, text, x, y }) {
-  const cells = text.split("\n")[y].split(delim);
-  const eCells = disp.split("\n")[y].slice(0, x).split(delim); // prettier-ignore
-  const n = eCells.length;
-  // FIXME: eCells have delims stripped, so `w` will be off by -1 for each cell index > 1
-  const w = range(n - 1).reduce((w, x) => w + cells[x].length, 0);
-  return w + Math.min(eCells[n - 1].length, cells[n - 1].length);
+const cellWidths = cells =>
+  cells.map((text, i) => text.length + (i > 0 ? 1 : 0));
+
+function displayToTextCol({ lines, displayLines, x, y }) {
+  const widths = cellWidths(lines[y].split(delim));
+  const eWidths = cellWidths(displayLines[y].slice(0, x).split(delim));
+  const i = eWidths.length - 1;
+  return (
+    widths.slice(0, i).reduce((sum, w) => sum + w, 0) +
+    Math.min(eWidths[i], widths[i])
+  );
 }
 
-function textToDisplayCol({ disp, text, x, y }) {
-  const eCells = disp.split("\n")[y].split(delim);
-  const cells = text.split("\n")[y].slice(0, x).split(delim); // prettier-ignore
-  const n = cells.length;
-  // FIXME: cells have delims stripped, so `w` will be off by -1 for each cell index > 1
-  const w = range(n - 1).reduce((w, x) => w + eCells[x].length, 0);
-  return w + cells[n - 1].length;
+function textToDisplayCol({ lines, displayLines, x, y }) {
+  const eWidths = cellWidths(displayLines[y].split(delim));
+  const widths = cellWidths(lines[y].slice(0, x).split(delim));
+  const i = widths.length - 1;
+  return eWidths.slice(0, i).reduce((sum, w) => sum + w, 0) + widths[i];
 }
 
 //------------------------------------------------------------------------------
@@ -169,9 +181,8 @@ function leftRight(dx) {
   Object.assign(state.cursor, { i, x, y, xMax });
 }
 function upDown(dy) {
-  const { text, cursor } = state;
+  const { text, lines, cursor } = state;
   const { xMax } = cursor;
-  const lines = text.split("\n");
   let { x, y } = getCursorXY({ text, i: cursor.i });
   y = clamp(y + dy, 0, lines.length - 1);
   x = clamp(xMax, 0, lines[y].length);
@@ -208,6 +219,7 @@ function onKey(e) {
     if (e.key === "Delete") edit(i, i + 1, "");
   }
   updateCamera();
+  deriveState();
   draw();
 }
 
@@ -216,7 +228,7 @@ function onKey(e) {
 //------------------------------------------------------------------------------
 
 function draw() {
-  const { text, cursor, cam } = state;
+  const { displayLines, cursor, cam } = state;
 
   ctx.save();
   ctx.beginPath();
@@ -225,7 +237,7 @@ function draw() {
   ctx.translate(margin, margin);
   ctx.translate(-cam.x * charSize.w, 0);
 
-  const lines = text.split("\n").slice(cam.y, cam.y + cam.h);
+  const lines = displayLines.slice(cam.y, cam.y + cam.h);
   ctx.font = `${fontSize}px ${fontFamily}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -287,10 +299,10 @@ function computeElasticBlocks(text, delim) {
 
 // View the given text with the elastic tabs expanded into spaces.
 function expandElasticChars(text, delim) {
-  const { blocks, widths } = computeElasticTabs(text, delim);
+  const table = text.split("\n").map(line => line.split(delim));
+  const { blocks, widths } = computeElasticBlocks(text, delim);
   const expandCell = (r, c) =>
-    // FIXME: text has delim prefix stripped when when c = 0
-    table[r][c].padEnd(widths[blocks[r][c]]);
+    (c > 0 ? "|" : "") + table[r][c].padEnd(widths[blocks[r][c]]);
   const numRows = table.length;
   const numCols = r => table[r].length;
   const lines = range(numRows).map(r => {
