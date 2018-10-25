@@ -27,10 +27,20 @@ function computeCharWidth(ctx) {
 //------------------------------------------------------------------------------
 // Utils
 //------------------------------------------------------------------------------
+
 function clamp(val, min, max) {
   val = Math.max(min, val);
   val = Math.min(max, val);
   return val;
+}
+
+function range(start, stop, step = 1) {
+  if (stop === undefined) [start, stop] = [0, start];
+  const result = [];
+  for (let i = start; i < stop; i += step) {
+    result.push(i);
+  }
+  return result;
 }
 
 //------------------------------------------------------------------------------
@@ -194,6 +204,54 @@ function draw() {
     ctx.fillRect(x, y, w, charSize.h);
   }
   ctx.restore();
+}
+
+//------------------------------------------------------------------------------
+// Elastic algorithm
+//------------------------------------------------------------------------------
+
+// Computes the size of all elastic tabs in the given text.
+function computeElasticTabs(text) {
+  // We ignore the last cell of each line
+  // since the standard says we only count cells _behind_ a tab character.
+  const table = text.split("\n").map(line => line.split("\t").slice(0, -1));
+
+  // result objects
+  const tableUnpruned = text.split("\n").map(line => line.split("\t"));
+  const cellBlocks = {}; // map a cell coordinate `${row},${col}` to a block index
+  const blockWidths = []; // map a block index to a width
+
+  // cells by coordinate
+  const numRows = table.length;
+  const numCols = Math.max(...table.map(cells => cells.length));
+  const getCell = (r, c) => ({ r, c, text: table[r][c] });
+
+  // for each column, we group cells into blocks
+  for (const c of range(numCols)) {
+    // Get every cell in this column.
+    const column = range(numRows)
+      .map(r => getCell(r, c))
+      .filter(({ text }) => text != null);
+
+    // Group contiguous cells into blocks.
+    const blocks = splitArray(column, (curr, prev) => curr.r !== prev.r + 1);
+
+    // process each block
+    for (const cells of blocks) {
+      // compute block width
+      const w = Math.max(...cells.map(({ text }) => text.length));
+      // create a new index to identify this block
+      const blockI = blockWidths.length;
+      // associate each of our cell coordinates to this block
+      for (const { r } of cells) {
+        cellBlocks[`${r},${c}`] = blockI;
+      }
+      // store the width of the block
+      blockWidths.push(w);
+    }
+  }
+
+  return { table: tableUnpruned, cellBlocks, blockWidths };
 }
 
 //------------------------------------------------------------------------------
