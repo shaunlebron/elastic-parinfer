@@ -43,6 +43,22 @@ function range(start, stop, step = 1) {
   return result;
 }
 
+function splitArray(array, shouldSplit) {
+  const n = array.length;
+  if (n === 0) return [];
+
+  // get each position in the array where a split should occur
+  let indexes = range(1, n).filter(i => shouldSplit(array[i], array[i - 1]));
+
+  // insert start/end points
+  indexes = [0, ...indexes, n];
+
+  // group elements between the indexes
+  return range(0, indexes.length - 1).map(i =>
+    array.slice(indexes[i], indexes[i + 1])
+  );
+}
+
 //------------------------------------------------------------------------------
 // Canvas
 //------------------------------------------------------------------------------
@@ -211,13 +227,13 @@ function draw() {
 //------------------------------------------------------------------------------
 
 // Computes the size of all elastic tabs in the given text.
-function computeElasticTabs(text) {
+function computeElasticBlocks(text, delim) {
   // We ignore the last cell of each line
   // since the standard says we only count cells _behind_ a tab character.
-  const table = text.split("\n").map(line => line.split("\t").slice(0, -1));
+  const table = text.split("\n").map(line => line.split(delim).slice(0, -1));
 
   // result objects
-  const tableUnpruned = text.split("\n").map(line => line.split("\t"));
+  const tableUnpruned = text.split("\n").map(line => line.split(delim));
   const cellBlocks = {}; // map a cell coordinate `${row},${col}` to a block index
   const blockWidths = []; // map a block index to a width
 
