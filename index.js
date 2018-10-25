@@ -18,19 +18,19 @@ const state = {
 };
 
 const initialText = `(|defn foo
- | "hello, this is a docstring"
- | [a b]
- | (|let [|sum (+ a b)
- |  |     |prod (* a b)]
- |  |
- |  |  {|:sum sum
- |  |   |:prod prod}))
+|"hello, this is a docstring"
+|[a b]
+|(|let [|sum (+ a b)
+|||prod (* a b)]
+||
+||{|:sum sum
+|||:prod prod}))
 
-(foo |bar
-     |baz)
+(foo|bar
+|baz)
 
 (|foo bar
- |baz)
+|baz)
 `;
 
 //------------------------------------------------------------------------------
