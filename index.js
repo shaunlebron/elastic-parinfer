@@ -20,8 +20,8 @@ const state = {
 const initialText = `(|defn foo
  | "hello, this is a docstring"
  | [a b]
- | (|let [sum (+ a b)
- |  |     prod (* a b)]
+ | (|let [|sum (+ a b)
+ |  |     |prod (* a b)]
  |  |
  |  |  {|:sum sum
  |  |   |:prod prod}))
@@ -37,8 +37,9 @@ const initialText = `(|defn foo
 // Typography
 //------------------------------------------------------------------------------
 
-const backgroundColor = "black";
-const fontColor = "white";
+const backgroundColor = "#111";
+const fontColor = "#eee";
+const delimColor = "#555";
 const margin = 50;
 const fontFamily = "Menlo, monospace";
 const fontSize = 40;
@@ -259,10 +260,12 @@ function draw() {
   ctx.font = `${fontSize}px ${fontFamily}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
-  ctx.fillStyle = fontColor;
   for (const [i, line] of Object.entries(lines)) {
     const y = i * charSize.h;
+    ctx.fillStyle = fontColor;
     ctx.fillText(line, 0, y);
+    ctx.fillStyle = delimColor;
+    ctx.fillText(line.replace(/[^\|]/g, " "), 0, y);
   }
 
   if (cursor.on) {
