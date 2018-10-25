@@ -2,30 +2,20 @@
 // State
 //------------------------------------------------------------------------------
 
-const elasticDelim = "|";
+const delim = "|";
 
 const state = {
-  // FIXME: replace xMax with displayCursor.xMax
-  cursor: { i: 0, x: 0, y: 0, xMax: 0, t: 0 },
+  cursor: { i: 0, x: 0, y: 0, t: 0 },
   cam: { x: 0, y: 0, w: 0, h: 0 },
   text: "",
 
   // derived from text
   lines: [""],
+
   displayText: "",
   displayLines: [""],
   displayCursor: { x: 0, xMax: 0 }
 };
-
-function deriveState() {
-  const { text } = state;
-  const displayText = expandElasticChars(text, elasticDelim);
-
-  state.lines = text.split("\n");
-  state.diplayText = displayText;
-  state.displayLines = displayText.split("\n");
-  // TODO: state.displayCursor
-}
 
 //------------------------------------------------------------------------------
 // Typography
@@ -103,7 +93,7 @@ function resizeCanvas() {
 }
 
 //------------------------------------------------------------------------------
-// Cursor
+// Derived State
 //------------------------------------------------------------------------------
 
 function updateCursorBlink(dt) {
@@ -116,9 +106,12 @@ function updateCursorBlink(dt) {
   }
 }
 
-//------------------------------------------------------------------------------
-// Camera
-//------------------------------------------------------------------------------
+function updateDisplayCursor() {
+  const { x, y } = state.cursor;
+  const x0 = textToDisplayCol(state, x, y);
+  state.displayCursor.x = x0;
+  state.displayCursor.xMax = x0;
+}
 
 function updateCamera() {
   const { cam, cursor } = state;
@@ -126,6 +119,15 @@ function updateCamera() {
   cam.h = Math.floor((canvasH - 2 * margin) / charSize.h);
   cam.x = clamp(cam.x, cursor.x - cam.w + 1, cursor.x);
   cam.y = clamp(cam.y, cursor.y - cam.h + 1, cursor.y);
+}
+
+function updateText(text) {
+  const displayText = expandElasticChars(text);
+
+  state.text = text;
+  state.lines = text.split("\n");
+  state.diplayText = displayText;
+  state.displayLines = displayText.split("\n");
 }
 
 //------------------------------------------------------------------------------
@@ -151,7 +153,7 @@ function getCursorI({ lines, x, y }) {
 const cellWidths = cells =>
   cells.map((text, i) => text.length + (i > 0 ? 1 : 0));
 
-function displayToTextCol({ lines, displayLines, x, y }) {
+function displayToTextCol({ lines, displayLines }, x, y) {
   const widths = cellWidths(lines[y].split(delim));
   const eWidths = cellWidths(displayLines[y].slice(0, x).split(delim));
   const i = eWidths.length - 1;
@@ -161,7 +163,7 @@ function displayToTextCol({ lines, displayLines, x, y }) {
   );
 }
 
-function textToDisplayCol({ lines, displayLines, x, y }) {
+function textToDisplayCol({ lines, displayLines }, x, y) {
   const eWidths = cellWidths(displayLines[y].split(delim));
   const widths = cellWidths(lines[y].slice(0, x).split(delim));
   const i = widths.length - 1;
@@ -176,19 +178,19 @@ function leftRight(dx) {
   const { text, cursor } = state;
   const i = clamp(cursor.i + dx, 0, text.length);
   const { x, y } = getCursorXY({ text, i });
-  const xMax = x;
 
-  Object.assign(state.cursor, { i, x, y, xMax });
+  Object.assign(state.cursor, { i, x, y });
+  updateDisplayCursor();
 }
 function upDown(dy) {
-  const { text, lines, cursor } = state;
-  const { xMax } = cursor;
-  let { x, y } = getCursorXY({ text, i: cursor.i });
-  y = clamp(y + dy, 0, lines.length - 1);
-  x = clamp(xMax, 0, lines[y].length);
+  const { text, lines, cursor, displayCursor } = state;
+  const y = clamp(cursor.y + dy, 0, lines.length - 1);
+  const x = displayToTextCol(state, displayCursor.xMax, y);
   const i = getCursorI({ lines, x, y });
+  const displayX = textToDisplayCol(state, x, y);
 
-  Object.assign(state.cursor, { i, x, y, xMax });
+  Object.assign(state.cursor, { i, x, y });
+  state.displayCursor.x = displayX;
 }
 function edit(i0, i1, replace) {
   let { text } = state;
@@ -197,10 +199,10 @@ function edit(i0, i1, replace) {
   text = text.slice(0, i0) + replace + text.slice(i1);
   const i = i0 + replace.length;
   const { x, y } = getCursorXY({ text, i });
-  const xMax = x;
 
-  state.text = text;
-  Object.assign(state.cursor, { i, x, y, xMax });
+  updateText(text);
+  Object.assign(state.cursor, { i, x, y });
+  updateDisplayCursor();
 }
 
 function onKey(e) {
@@ -219,7 +221,6 @@ function onKey(e) {
     if (e.key === "Delete") edit(i, i + 1, "");
   }
   updateCamera();
-  deriveState();
   draw();
 }
 
@@ -228,7 +229,7 @@ function onKey(e) {
 //------------------------------------------------------------------------------
 
 function draw() {
-  const { displayLines, cursor, cam } = state;
+  const { displayLines, displayCursor, cursor, cam } = state;
 
   ctx.save();
   ctx.beginPath();
@@ -249,7 +250,7 @@ function draw() {
 
   if (cursor.on) {
     const w = Math.floor(charSize.w * 0.15);
-    const x = Math.floor(cursor.x * charSize.w - w / 2);
+    const x = Math.floor(displayCursor.x * charSize.w - w / 2);
     const y = Math.floor((cursor.y - cam.y) * charSize.h);
     ctx.fillStyle = fontColor;
     ctx.fillRect(x, y, w, charSize.h);
@@ -262,7 +263,7 @@ function draw() {
 //------------------------------------------------------------------------------
 
 // Computes the size of all elastic tabs in the given text.
-function computeElasticBlocks(text, delim) {
+function computeElasticBlocks(text) {
   // We ignore the last cell of each line
   // since the standard says we only count cells _behind_ a tab character.
   const table = text.split("\n").map(line => line.split(delim).slice(0, -1));
@@ -298,9 +299,9 @@ function computeElasticBlocks(text, delim) {
 }
 
 // View the given text with the elastic tabs expanded into spaces.
-function expandElasticChars(text, delim) {
+function expandElasticChars(text) {
   const table = text.split("\n").map(line => line.split(delim));
-  const { blocks, widths } = computeElasticBlocks(text, delim);
+  const { blocks, widths } = computeElasticBlocks(text);
   const expandCell = (r, c) =>
     (c > 0 ? "|" : "") + table[r][c].padEnd(widths[blocks[r][c]]);
   const numRows = table.length;
