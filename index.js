@@ -89,6 +89,7 @@ function initCanvas() {
   ctx = canvas.getContext("2d");
   computeCharWidth(ctx);
   resizeCanvas();
+  canvas.style.cursor = "text";
   document.body.onresize = () => {
     resizeCanvas();
     draw();
@@ -140,7 +141,6 @@ function updateCamera() {
 
 function updateText(text) {
   const displayText = expandElasticChars(text);
-  console.log(displayText);
 
   state.text = text;
   state.lines = text.split("\n");
@@ -239,6 +239,35 @@ function onKey(e) {
     if (e.key === "Delete") edit(i, i + 1, "");
   }
   draw();
+}
+
+function setCursorToMouse(e) {
+  const { cam } = state;
+  let y = Math.floor((e.offsetY - margin) / charSize.h);
+  y = cam.y + clamp(y, 0, cam.h - 1);
+  y = clamp(y, 0, state.lines.length - 1);
+  let x = Math.round((e.offsetX - margin) / charSize.w);
+  x = cam.x + clamp(x, 0, cam.w - 1);
+  x = displayToTextCol(state, x, y);
+  const { lines } = state;
+  const i = getCursorI({ lines, x, y });
+
+  Object.assign(state.cursor, { i, x, y, t: 0 });
+  updateDisplayCursor();
+  draw();
+}
+
+function onMouseDown(e) {
+  setCursorToMouse(e);
+  function onMouseMove(e) {
+    setCursorToMouse(e);
+  }
+  function onMouseUp(e) {
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+  }
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
 }
 
 //------------------------------------------------------------------------------
@@ -341,6 +370,7 @@ function init() {
   updateText(initialText);
   initCanvas();
   document.addEventListener("keydown", onKey);
+  document.addEventListener("mousedown", onMouseDown);
   tick();
 }
 
