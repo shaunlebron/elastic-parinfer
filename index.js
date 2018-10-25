@@ -9,6 +9,31 @@ const state = {
 };
 
 //------------------------------------------------------------------------------
+// Typography
+//------------------------------------------------------------------------------
+
+const backgroundColor = "black";
+const fontColor = "white";
+const margin = 50;
+const fontFamily = "Menlo, monospace";
+const fontSize = 40;
+const charSize = { w: null, h: fontSize * 1.2 };
+
+function computeCharWidth(ctx) {
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  charSize.w = ctx.measureText("8").width;
+}
+
+//------------------------------------------------------------------------------
+// Utils
+//------------------------------------------------------------------------------
+function clamp(val, min, max) {
+  val = Math.max(min, val);
+  val = Math.min(max, val);
+  return val;
+}
+
+//------------------------------------------------------------------------------
 // Canvas
 //------------------------------------------------------------------------------
 
@@ -20,7 +45,10 @@ function initCanvas() {
   ctx = canvas.getContext("2d");
   computeCharWidth(ctx);
   resizeCanvas();
-  document.body.onresize = resizeCanvas;
+  document.body.onresize = () => {
+    resizeCanvas();
+    draw();
+  };
 }
 
 function resizeCanvas() {
@@ -35,22 +63,6 @@ function resizeCanvas() {
   canvas.style.width = `${canvasW}px`;
   canvas.style.height = `${canvasH}px`;
   ctx.scale(canvasRatio, canvasRatio);
-}
-
-//------------------------------------------------------------------------------
-// Typography
-//------------------------------------------------------------------------------
-
-const backgroundColor = "black";
-const fontColor = "white";
-const margin = 20;
-const fontFamily = "monospace";
-const fontSize = 10;
-const charSize = { w: null, h: 12 };
-
-function computeCharWidth(ctx) {
-  ctx.font = `${fontSize}px ${fontFamily}`;
-  charSize.w = ctx.measureText("8").width;
 }
 
 //------------------------------------------------------------------------------
@@ -72,9 +84,9 @@ function updateCursorBlink(dt) {
 //------------------------------------------------------------------------------
 
 function updateCamera() {
-  const { cam } = state;
-  cam.w = Math.floor((width - 2 * margin) / charSize.w);
-  cam.h = Math.floor((height - 2 * margin) / charSize.h);
+  const { cam, cursor } = state;
+  cam.w = Math.floor((canvasW - 2 * margin) / charSize.w);
+  cam.h = Math.floor((canvasH - 2 * margin) / charSize.h);
   cam.x = clamp(cam.x, cursor.x - cam.w + 1, cursor.x);
   cam.y = clamp(cam.y, cursor.y - cam.h + 1, cursor.y);
 }
@@ -105,7 +117,7 @@ function leftRight(dx) {
   const { x, y } = getCursorXY({ text, i });
   const xMax = x;
 
-  state.cursor = { i, x, y, xMax };
+  Object.assign(state.cursor, { i, x, y, xMax });
 }
 function upDown(dy) {
   const { text, cursor } = state;
@@ -116,7 +128,7 @@ function upDown(dy) {
   x = clamp(xMax, 0, lines[y].length);
   const i = getCursorI({ lines, x, y });
 
-  state.cursor = { i, x, y, xMax };
+  Object.assign(state.cursor, { i, x, y, xMax });
 }
 function edit(i0, i1, replace) {
   let { text } = state;
@@ -128,25 +140,26 @@ function edit(i0, i1, replace) {
   const xMax = x;
 
   state.text = text;
-  state.cursor = { i, x, y, xMax };
+  Object.assign(state.cursor, { i, x, y, xMax });
 }
 
 function onKey(e) {
   state.cursor.t = 0;
   if (!e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-    if (e.key === "ArrowLeft") return leftRight(state, -1);
-    if (e.key === "ArrowRight") return leftRight(state, 1);
-    if (e.key === "ArrowUp") return upDown(state, -1);
-    if (e.key === "ArrowDown") return upDown(state, 1);
+    if (e.key === "ArrowLeft") leftRight(-1);
+    if (e.key === "ArrowRight") leftRight(1);
+    if (e.key === "ArrowUp") upDown(-1);
+    if (e.key === "ArrowDown") upDown(1);
   }
   if (!e.ctrlKey && !e.altKey && !e.metaKey) {
     const { i } = state.cursor;
-    if (e.key.length === 1) return edit(state, i, i, e.key);
-    if (e.key === "Enter") return edit(state, i, i, "\n");
-    if (e.key === "Backspace") return edit(state, i - 1, i, "");
-    if (e.key === "Delete") return edit(state, i, i + 1, "");
+    if (e.key.length === 1) edit(i, i, e.key);
+    if (e.key === "Enter") edit(i, i, "\n");
+    if (e.key === "Backspace") edit(i - 1, i, "");
+    if (e.key === "Delete") edit(i, i + 1, "");
   }
   updateCamera();
+  draw();
 }
 
 //------------------------------------------------------------------------------
@@ -161,8 +174,7 @@ function draw() {
   ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, canvasW, canvasH);
   ctx.translate(margin, margin);
-  ctx.scale(cam.k, cam.k);
-  ctx.translate({ x: -cam.x * charSize.w, y: 0 });
+  ctx.translate(-cam.x * charSize.w, 0);
 
   const lines = text.split("\n").slice(cam.y, cam.y + cam.h);
   ctx.font = `${fontSize}px ${fontFamily}`;
@@ -175,9 +187,9 @@ function draw() {
   }
 
   if (cursor.on) {
-    const w = charSize.w * 0.1;
-    const x = cursor.x * charSize.w - w / 2;
-    const y = (cursor.y - cam.y) * charSize.h;
+    const w = Math.floor(charSize.w * 0.15);
+    const x = Math.floor(cursor.x * charSize.w - w / 2);
+    const y = Math.floor((cursor.y - cam.y) * charSize.h);
     ctx.fillStyle = fontColor;
     ctx.fillRect(x, y, w, charSize.h);
   }
@@ -190,7 +202,7 @@ function draw() {
 
 function init() {
   initCanvas();
-  document.addEventListener("keydown", e => onKey(state, e));
+  document.addEventListener("keydown", onKey);
   tick();
 }
 
@@ -199,7 +211,7 @@ function tick() {
   const t = window.performance.now();
   if (lastT) {
     const dt = t - lastT;
-    updateCursorBlink(dt);
+    updateCursorBlink(dt / 1000);
   }
   lastT = t;
   requestAnimationFrame(tick);
