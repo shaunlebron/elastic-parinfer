@@ -237,6 +237,14 @@ function onKey(e) {
     if (e.key === "Enter") edit(i, i, "\n");
     if (e.key === "Backspace") edit(i - 1, i, "");
     if (e.key === "Delete") edit(i, i + 1, "");
+    if (e.key === "Tab") {
+      if (e.shiftKey) {
+        if (state.text[i - 1] === delim) edit(i - 1, i, "");
+      } else {
+        edit(i, i, delim);
+      }
+      e.preventDefault();
+    }
   }
   draw();
 }
