@@ -1,3 +1,5 @@
+import { indentMode } from "./parinfer.js";
+
 //------------------------------------------------------------------------------
 // State
 //------------------------------------------------------------------------------
@@ -139,8 +141,30 @@ function updateCamera() {
   cam.y = clamp(cam.y, cursor.y - cam.h + 1, cursor.y);
 }
 
+function processText(text) {
+  text = expandElasticChars(text);
+  const indents = [];
+  const lines = [];
+  const pipeMatcher = new RegExp(`^([\\s${delim}]*)(.*)`);
+  const cleanPipes = line =>
+    line.replace(pipeMatcher, (_, indent, code) => {
+      indents.push(indent);
+      return " ".repeat(indent.length) + code;
+    });
+  const restorePipes = (line, i) => indents[i] + line.slice(indents[i].length);
+  const inputText = text
+    .split("\n")
+    .map(cleanPipes)
+    .join("\n");
+  const outputText = indentMode(inputText).text;
+  return outputText
+    .split("\n")
+    .map(restorePipes)
+    .join("\n");
+}
+
 function updateText(text) {
-  const displayText = expandElasticChars(text);
+  const displayText = processText(text);
 
   state.text = text;
   state.lines = text.split("\n");
@@ -302,7 +326,7 @@ function draw() {
     ctx.fillStyle = fontColor;
     ctx.fillText(line, 0, y);
     ctx.fillStyle = delimColor;
-    ctx.fillText(line.replace(/[^\|]/g, " "), 0, y);
+    ctx.fillText(line.replace(new RegExp(`[^${delim}]`, "g"), " "), 0, y);
   }
 
   if (cursor.on) {
@@ -360,7 +384,7 @@ function expandElasticChars(text) {
   const table = text.split("\n").map(line => line.split(delim));
   const { blocks, widths } = computeElasticBlocks(text);
   const expandCell = (r, c) =>
-    (c > 0 ? "|" : "") + table[r][c].padEnd(widths[blocks[r][c]]);
+    (c > 0 ? delim : "") + table[r][c].padEnd(widths[blocks[r][c]]);
   const numRows = table.length;
   const numCols = r => table[r].length;
   const lines = range(numRows).map(r => {
