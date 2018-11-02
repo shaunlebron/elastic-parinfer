@@ -163,13 +163,47 @@ function processText(text) {
     .join("\n");
 }
 
-function updateText(text) {
+function updateText(text, newChar) {
   const displayText = processText(text);
 
   state.text = text;
+  state.oldLines = state.lines;
   state.lines = text.split("\n");
   state.displayText = displayText;
+  state.oldDisplayLines = state.displayLines;
   state.displayLines = displayText.split("\n");
+}
+
+function setTextAnimation(oldStr, newStr) {
+  const { cursor, lines, oldLines, displayLines, oldDisplayLines } = state;
+  const oldCells = oldLines.map(line => line.split(delim));
+  const cells = lines.map(line => line.split(delim).map((cell,i) => (i === 0 ? "" : delim) + cell));
+  const newWs = displayLines.map(line => line.split(delim).map(s => s.length));
+  const oldWs = oldDisplayLines.map(line => line.split(delim).map(s => s.length));
+  const { x, y } = cursor;
+  const i = lines[y].slice(0, x).split(delim).length-1; // cell number of cursor
+  if (newStr === "|" && oldStr === "") {
+    // SPLIT CELL
+    oldWs[y].splice(i-1, 1,
+      cells[y][i-1].length,
+      oldWs[y][i-1].length - cells[y][i].length
+    );
+  } else if (newStr === "" && oldStr === "|") {
+    // MERGE CELLS
+    cells[y].splice(i, 1,
+      (i === 0 ? "" : delim) + oldCells[y][i],
+      oldCells[y][i+1]
+    );
+    newWs[y].splice(i, 1,
+      oldWs[y][i],
+      newWs[y][i] - oldWs[y][i]
+    );
+  } else if (newStr === "\n" && oldStr === "") {
+    // SPLIT LINE
+  } else if (newStr === "" && oldStr === "\n") {
+    // MERGE LINES
+  }
+  // TODO: combine cells,newWs,oldWs into animation state
 }
 
 //------------------------------------------------------------------------------
@@ -234,16 +268,18 @@ function upDown(dy) {
   Object.assign(state.cursor, { i, x, y });
   state.displayCursor.x = displayX;
 }
-function edit(i0, i1, replace) {
+function edit(i0, i1, newStr) {
   let { text } = state;
   i0 = clamp(i0, 0, text.length + 1);
   i1 = clamp(i1, 0, text.length + 1);
-  text = text.slice(0, i0) + replace + text.slice(i1);
-  const i = i0 + replace.length;
+  const oldStr = text.slice(i0, i1);
+  text = text.slice(0, i0) + newStr + text.slice(i1);
+  const i = i0 + newStr.length;
   const { x, y } = getCursorXY({ text, i });
 
   updateText(text);
   Object.assign(state.cursor, { i, x, y });
+  // setTextAnimation(oldStr, newStr);
   updateDisplayCursor();
 }
 
