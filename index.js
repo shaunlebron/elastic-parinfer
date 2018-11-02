@@ -177,36 +177,52 @@ function updateText(text, newChar) {
 // TODO: when animating, add 1 to width if cell starts with delim
 function setTextAnimation(oldStr, newStr) {
   const { cursor, lines, oldLines, displayLines, oldDisplayLines } = state;
-  const oldCells = oldLines.map(line => line.split(delim));
-  const cells = lines.map(line => line.split(delim));
-  const prints = lines.map(line => line.split(delim).map((cell,i) => (i === 0 ? "" : delim) + cell));
-  const newWs = displayLines.map(line => line.split(delim).map(s => s.length));
-  const oldWs = oldDisplayLines.map(line => line.split(delim).map(s => s.length));
+  const oldVals = oldLines.map(line => line.split(delim));
+  const newVals = lines.map(line => line.split(delim));
+  const movVals = lines.map(line => line.split(delim).map((cell,i) => (i === 0 ? "" : delim) + cell));
+  const oldWidths = oldDisplayLines.map(line => line.split(delim).map(s => s.length));
+  const newWidths = displayLines.map(line => line.split(delim).map(s => s.length));
   const { x, y } = cursor;
   const i = lines[y].slice(0, x).split(delim).length-1; // cell number of cursor
   if (newStr === "|" && oldStr === "") {
     // SPLIT CELL
-    const cw = oldWs[y][i-1];
-    const a = cells[y][i-1];
-    oldWs[y].splice(i-1, 1, a.length, cw - a.length);
+    //  line y: ...|   c   |...  => ...| a | b |...
+    //          ...|  i-1  |...     ...|i-1| i |...
+    const cw = oldWidths[y][i-1];
+    const a = newVals[y][i-1];
+    oldWidths[y].splice(i-1, 1, a.length, cw - a.length);
   } else if (newStr === "" && oldStr === "|") {
     // MERGE CELLS
-    const [a,b] = oldCells[y].slice(i,i+2);
-    const cw = newWs[y][i];
-    newWs[y].splice(i, 1, a.length, cw - a.length);
-    prints[y].splice(i, 1, (i === 0 ? "" : delim) + a, b);
+    //  line y: ...| a | b |...  => ...|   c   |...
+    //          ...| i |i+1|...     ...|   i   |...
+    const [a,b] = oldVals[y].slice(i,i+2);
+    const cw = newWidths[y][i];
+    newWidths[y].splice(i, 1, a.length, cw - a.length);
+    movVals[y].splice(i, 1, (i === 0 ? "" : delim) + a, b);
   } else if (newStr === "\n" && oldStr === "") {
     // SPLIT LINE
-    const i = cells[y-1].length-1;
-    const [cw, ...restws] = oldWs[y-1].slice(i);
-    const a = cells[y-1][i];
-    oldWs.splice(y, 0, [cw - a.length, ...restws]);
+    //  line y-1: ...|   c   |...  => ...| a
+    //            ...|   i   |...     ...| i
+    //  --------------------------
+    //  line y:   ...             \=>  b |...
+    //                             \   0 |...
+    //                              ---------
+    const i = newVals[y-1].length-1;
+    const [cw, ...restWidths] = oldWidths[y-1].slice(i);
+    const a = newVals[y-1][i];
+    oldWs.splice(y, 0, [cw - a.length, ...restWidths]);
     oldWs[y-1].splice(i+1);
   } else if (newStr === "" && oldStr === "\n") {
     // MERGE LINES
-    const a = oldCells[y][i];
-    const [bw, ...restws] = oldWs[y+1];
-    oldWs[y].splice(i, 1, a.length + bw, ...restws);
+    //  line y:   ...| a  =>   ...|   c   |...
+    //            ...| i       ...|   i   |...
+    //                        ------------------
+    //  line y+1:  b |... => / ...
+    //             0 |...   /
+    //  --------------------
+    const a = oldVals[y][i];
+    const [bw, ...restWidths] = oldWs[y+1];
+    oldWs[y].splice(i, 1, a.length + bw, ...restWidths);
     oldWs.splice(y+1, 1);
   } else {
     // no animation
