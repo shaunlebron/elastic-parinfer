@@ -186,27 +186,27 @@ function setTextAnimation(oldStr, newStr) {
   const i = lines[y].slice(0, x).split(delim).length-1; // cell number of cursor
   if (newStr === "|" && oldStr === "") {
     // SPLIT CELL
-    //  line y: ...|   c   |...  => ...| a | b |...
-    //          ...|  i-1  |...     ...|i-1| i |...
+    //          i-1                  i-1   i
+    // y  "...|  c  |..."  =>  "...|  a  | b |..."
+    //
     const cw = oldWidths[y][i-1];
     const a = newVals[y][i-1];
     oldWidths[y].splice(i-1, 1, a.length, cw - a.length);
   } else if (newStr === "" && oldStr === "|") {
     // MERGE CELLS
-    //  line y: ...| a | b |...  => ...|   c   |...
-    //          ...| i |i+1|...     ...|   i   |...
+    //          i   i+1                   i
+    // y  "...| a |  b  |..."  =>  "...|  c  |..."
+    //
     const [a,b] = oldVals[y].slice(i,i+2);
     const cw = newWidths[y][i];
     newWidths[y].splice(i, 1, a.length, cw - a.length);
     movVals[y].splice(i, 1, (i === 0 ? "" : delim) + a, b);
   } else if (newStr === "\n" && oldStr === "") {
     // SPLIT LINE
-    //  line y-1: ...|   c   |...  => ...| a
-    //            ...|   i   |...     ...| i
-    //  --------------------------
-    //  line y:   ...             \=>  b |...
-    //                             \   0 |...
-    //                              ---------
+    //            i              0       i
+    // y-1  "...| c |..."  =>  ".......| a "
+    // y                       " b |......."
+    //
     const i = newVals[y-1].length-1;
     const [cw, ...restWidths] = oldWidths[y-1].slice(i);
     const a = newVals[y-1][i];
@@ -214,12 +214,10 @@ function setTextAnimation(oldStr, newStr) {
     oldWs[y-1].splice(i+1);
   } else if (newStr === "" && oldStr === "\n") {
     // MERGE LINES
-    //  line y:   ...| a  =>   ...|   c   |...
-    //            ...| i       ...|   i   |...
-    //                        ------------------
-    //  line y+1:  b |... => / ...
-    //             0 |...   /
-    //  --------------------
+    //       0       i              i
+    // y   ".......| a "  =>  "...| c |..."
+    // y+1 " b |......."
+    //
     const a = oldVals[y][i];
     const [bw, ...restWidths] = oldWs[y+1];
     oldWs[y].splice(i, 1, a.length + bw, ...restWidths);
