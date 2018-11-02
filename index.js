@@ -186,36 +186,31 @@ function setTextAnimation(oldStr, newStr) {
   const i = lines[y].slice(0, x).split(delim).length-1; // cell number of cursor
   if (newStr === "|" && oldStr === "") {
     // SPLIT CELL
-    oldWs[y].splice(i-1, 1,
-      cells[y][i-1].length,
-      oldWs[y][i-1].length - cells[y][i].length
-    );
+    const cw = oldWs[y][i-1];
+    const a = cells[y][i-1];
+    oldWs[y].splice(i-1, 1, a.length, cw - a.length);
   } else if (newStr === "" && oldStr === "|") {
     // MERGE CELLS
-    prints[y].splice(i, 1,
-      (i === 0 ? "" : delim) + oldCells[y][i],
-      oldCells[y][i+1]
-    );
-    newWs[y].splice(i, 1,
-      oldWs[y][i],
-      newWs[y][i] - oldWs[y][i]
-    );
+    const [a,b] = oldCells[y].slice(i,i+2);
+    const cw = newWs[y][i];
+    newWs[y].splice(i, 1, a.length, cw - a.length);
+    prints[y].splice(i, 1, (i === 0 ? "" : delim) + a, b);
   } else if (newStr === "\n" && oldStr === "") {
     // SPLIT LINE
     const i = cells[y-1].length-1;
-    oldWs.splice(y, 0,
-      oldWs[y-1][i] - cells[y-1][i].length,
-      oldWs[y-1][i] - cells[y][0].length,
-      ...oldWs[y-1].slice(i+1)
-    );
+    const [cw, ...restws] = oldWs[y-1].slice(i);
+    const a = cells[y-1][i];
+    oldWs.splice(y, 0, [cw - a.length, ...restws]);
     oldWs[y-1].splice(i+1);
   } else if (newStr === "" && oldStr === "\n") {
     // MERGE LINES
-    oldWs[y].splice(i, 1,
-      oldCells[y][i].length + oldWs[y+1][0],
-      ...oldWs[y+1].slice(1)
-    );
+    const a = oldCells[y][i];
+    const [bw, ...restws] = oldWs[y+1];
+    oldWs[y].splice(i, 1, a.length + bw, ...restws);
     oldWs.splice(y+1, 1);
+  } else {
+    // no animation
+    return;
   }
   // TODO: combine prints,newWs,oldWs into animation state
 }
