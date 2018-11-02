@@ -343,20 +343,19 @@ function draw() {
 // Elastic algorithm
 //------------------------------------------------------------------------------
 
-// Computes the size of all elastic tabs in the given text.
-function computeElasticBlocks(text) {
-  // We ignore the last cell of each line
-  // since the standard says we only count cells _behind_ a tab character.
-  const table = text.split("\n").map(line => line.split(delim).slice(0, -1));
+// View the given text with the elastic delims expanded into spaces.
+function expandElasticChars(text) {
+  const all = text.split("\n").map(line => line.split(delim));
+  const heads = all.map(cells => cells.slice(0, -1));
+  const tails = all.map(cells => cells.slice(-1)[0]);
 
   // result objects
-  const blocks = range(table.length).map(() => []);
-  const widths = []; // map a block index to a width
+  const result = range(heads.length).map(() => []);
 
   // cells by coordinate
-  const numRows = table.length;
-  const numCols = Math.max(...table.map(cells => cells.length));
-  const getCell = (r, c) => ({ r, c, text: table[r][c] });
+  const numRows = heads.length;
+  const numCols = Math.max(...heads.map(cells => cells.length));
+  const getCell = (r, c) => ({ r, c, text: heads[r][c] });
 
   // for each column, we group cells into blocks
   for (const c of range(numCols)) {
@@ -371,27 +370,10 @@ function computeElasticBlocks(text) {
     // process each block
     for (const cells of groups) {
       const w = Math.max(...cells.map(cell => cell.text.length));
-      const i = widths.length;
-      for (const { r } of cells) blocks[r].push(i);
-      widths.push(w);
+      for (const { r, text } of cells) result[r].push(text.padEnd(w));
     }
   }
-  return { blocks, widths };
-}
-
-// View the given text with the elastic tabs expanded into spaces.
-function expandElasticChars(text) {
-  const table = text.split("\n").map(line => line.split(delim));
-  const { blocks, widths } = computeElasticBlocks(text);
-  const expandCell = (r, c) =>
-    (c > 0 ? delim : "") + table[r][c].padEnd(widths[blocks[r][c]]);
-  const numRows = table.length;
-  const numCols = r => table[r].length;
-  const lines = range(numRows).map(r => {
-    const cells = range(numCols(r)).map(c => expandCell(r, c));
-    return cells.join("");
-  });
-  return lines.join("\n");
+  return result.map((cells, i) => [...cells, tails[i]].join(delim)).join("\n");
 }
 
 //------------------------------------------------------------------------------
