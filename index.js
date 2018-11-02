@@ -174,10 +174,12 @@ function updateText(text, newChar) {
   state.displayLines = displayText.split("\n");
 }
 
+// TODO: when animating, add 1 to width if cell starts with delim
 function setTextAnimation(oldStr, newStr) {
   const { cursor, lines, oldLines, displayLines, oldDisplayLines } = state;
   const oldCells = oldLines.map(line => line.split(delim));
-  const cells = lines.map(line => line.split(delim).map((cell,i) => (i === 0 ? "" : delim) + cell));
+  const cells = lines.map(line => line.split(delim));
+  const prints = lines.map(line => line.split(delim).map((cell,i) => (i === 0 ? "" : delim) + cell));
   const newWs = displayLines.map(line => line.split(delim).map(s => s.length));
   const oldWs = oldDisplayLines.map(line => line.split(delim).map(s => s.length));
   const { x, y } = cursor;
@@ -190,7 +192,7 @@ function setTextAnimation(oldStr, newStr) {
     );
   } else if (newStr === "" && oldStr === "|") {
     // MERGE CELLS
-    cells[y].splice(i, 1,
+    prints[y].splice(i, 1,
       (i === 0 ? "" : delim) + oldCells[y][i],
       oldCells[y][i+1]
     );
@@ -200,10 +202,22 @@ function setTextAnimation(oldStr, newStr) {
     );
   } else if (newStr === "\n" && oldStr === "") {
     // SPLIT LINE
+    const i = cells[y-1].length-1;
+    oldWs.splice(y, 0,
+      oldWs[y-1][i] - cells[y-1][i].length,
+      oldWs[y-1][i] - cells[y][0].length,
+      ...oldWs[y-1].slice(i+1)
+    );
+    oldWs[y-1].splice(i+1);
   } else if (newStr === "" && oldStr === "\n") {
     // MERGE LINES
+    oldWs[y].splice(i, 1,
+      oldCells[y][i].length + oldWs[y+1][0],
+      ...oldWs[y+1].slice(1)
+    );
+    oldWs.splice(y+1, 1);
   }
-  // TODO: combine cells,newWs,oldWs into animation state
+  // TODO: combine prints,newWs,oldWs into animation state
 }
 
 //------------------------------------------------------------------------------
