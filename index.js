@@ -179,54 +179,71 @@ function setTextAnimation(oldStr, newStr) {
   const { cursor, lines, oldLines, displayLines, oldDisplayLines } = state;
   const oldVals = oldLines.map(line => line.split(delim));
   const newVals = lines.map(line => line.split(delim));
-  const movVals = lines.map(line => line.split(delim).map((cell,i) => (i === 0 ? "" : delim) + cell));
+  const delimVal = (val,i) => (i === 0 ? "" : delim) + val;
+  const delimVals = lines.map(line => line.split(delim).map(delimVal));
   const oldWidths = oldDisplayLines.map(line => line.split(delim).map(s => s.length));
   const newWidths = displayLines.map(line => line.split(delim).map(s => s.length));
   const { x, y } = cursor;
   const i = lines[y].slice(0, x).split(delim).length-1; // cell number of cursor
   if (newStr === "|" && oldStr === "") {
     // SPLIT CELL
-    //          i-1                  i-1   i
-    // y  "...|  c  |..."  =>  "...|  a  | b |..."
-    //
-    const cw = oldWidths[y][i-1];
+    // (|ab| => |a|b|)
+    //                  OLD | NEW
+    //           i-1        |        i-1   i
+    //   /------------------|----------------------\
+    // y | "...| a b |..."  |  "...|  a  | b |..." | y
+    //   \--------^---------|-------------^--------/
+    //            | cursor before         | cursor after
+    const oldW = oldWidths[y][i-1];
     const a = newVals[y][i-1];
-    oldWidths[y].splice(i-1, 1, a.length, cw - a.length);
+    oldWidths[y].splice(i-1, 1, a.length, oldW - a.length);
   } else if (newStr === "" && oldStr === "|") {
     // MERGE CELLS
-    //          i   i+1                   i
-    // y  "...| a |  b  |..."  =>  "...|  c  |..."
-    //
+    // (|a|b| => |ab|)
+    //                      OLD | NEW
+    //           i   i+1        |         i
+    //   /----------------------|------------------\
+    // y | "...| a |  b  |..."  |  "...| a b |..." | y
+    //   \----------^-----------|---------^--------/
+    //              | cursor before       | cursor after
     const [a,b] = oldVals[y].slice(i,i+2);
-    const cw = newWidths[y][i];
-    newWidths[y].splice(i, 1, a.length, cw - a.length);
-    movVals[y].splice(i, 1, (i === 0 ? "" : delim) + a, b);
+    const newW = newWidths[y][i];
+    newWidths[y].splice(i, 1, a.length, newW - a.length);
+    delimVals[y].splice(i, 1, delimVal(a, i), b);
   } else if (newStr === "\n" && oldStr === "") {
     // SPLIT LINE
-    //            i              0       i
-    // y-1  "...| c |..."  =>  ".......| a "
-    // y                       " b |......."
-    //
+    // (|ab| => |a \n b|)
+    //                     OLD | NEW
+    //               i         |    0       i
+    //     /-------------------|----------------\
+    // y-1 |  "...| a b |..."  |  ".......| a " | y-1
+    //     \---------^---------|  " b |......." | y
+    //               |         \---^------------/
+    //       cursor before         | cursor after
     const i = newVals[y-1].length-1;
-    const [cw, ...restWidths] = oldWidths[y-1].slice(i);
     const a = newVals[y-1][i];
-    oldWs.splice(y, 0, [cw - a.length, ...restWidths]);
-    oldWs[y-1].splice(i+1);
+    const [oldW, ...rest] = oldWidths[y-1].slice(i);
+    oldWidths.splice(y, 0, [oldW - a.length, ...rest]);
+    oldWidths[y-1].splice(i+1);
   } else if (newStr === "" && oldStr === "\n") {
     // MERGE LINES
-    //       0       i              i
-    // y   ".......| a "  =>  "...| c |..."
-    // y+1 " b |......."
-    //
+    // (|a \n b| => |ab|)
+    //                  OLD | NEW
+    //         0       i    |         i
+    //     /----------------|------------------\
+    // y   | ".......| a "  |  "...| a b |..." | y
+    // y+1 | " b |......."  |---------^--------/
+    //     \--^-------------/         |
+    //        | cursor before    cursor after
     const a = oldVals[y][i];
-    const [bw, ...restWidths] = oldWs[y+1];
-    oldWs[y].splice(i, 1, a.length + bw, ...restWidths);
-    oldWs.splice(y+1, 1);
+    const [bw, ...rest] = oldWidths[y+1];
+    oldWidths[y].splice(i, 1, a.length + bw, ...rest);
+    oldWidths.splice(y+1, 1);
   } else {
     // no animation
     return;
   }
-  // TODO: combine prints,newWs,oldWs into animation state
+  // TODO: set state animation to { delimVals, oldWidths, newWidths }
 }
 
 //------------------------------------------------------------------------------
