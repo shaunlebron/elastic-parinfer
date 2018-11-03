@@ -5,6 +5,7 @@ import { indentMode } from "./parinfer.js";
 //------------------------------------------------------------------------------
 
 const delim = "|";
+const animTime = 0.1;
 
 const state = {
   cursor: { i: 0, x: 0, y: 0, t: 0 },
@@ -244,13 +245,13 @@ function setTextAnimation(oldStr, newStr) {
     state.textAnim = null;
     return;
   }
-  state.textAnim = { delimVals, oldWidths, newWidths, t: 0, targetT: 0.2 };
+  state.textAnim = { delimVals, oldWidths, newWidths, t: 0 };
 }
 
 function updateTextAnim(dt) {
   const { textAnim } = state;
   if (!textAnim) return;
-  if (textAnim.t + dt > textAnim.targetT) state.textAnim = null;
+  if (textAnim.t + dt > animTime) state.textAnim = null;
   else textAnim.t += dt;
   state.cursor.t = 0;
   draw();
@@ -423,7 +424,7 @@ function draw() {
   ctx.textBaseline = "top";
   if (textAnim) {
     // draw motion text
-    const { delimVals, oldWidths, newWidths, t, targetT } = textAnim;
+    const { delimVals, oldWidths, newWidths, t  } = textAnim;
     const numLines = delimVals.length;
     for (const y of range(numLines)) {
       let x = 0;
@@ -431,8 +432,8 @@ function draw() {
       for (const c of range(numCells)) {
         const val = delimVals[y][c];
         drawText(val, x, y);
-        const w = tween(oldWidths[y][c], newWidths[y][c], t / targetT);
-        x += w + (val.startsWith(delim) ? 0 : 1);
+        const w = tween(oldWidths[y][c], newWidths[y][c], t / animTime );
+        x += w + (val.startsWith(delim) ? 1 : 0);
       }
     }
   } else {
