@@ -241,9 +241,19 @@ function setTextAnimation(oldStr, newStr) {
     oldWidths.splice(y+1, 1);
   } else {
     // no animation
+    state.textAnim = null;
     return;
   }
-  // TODO: set state animation to { delimVals, oldWidths, newWidths }
+  state.textAnim = { delimVals, oldWidths, newWidths, t: 0, targetT: 0.2 };
+}
+
+function updateTextAnim(dt) {
+  const { textAnim } = state;
+  if (!textAnim) return;
+  if (textAnim.t + dt > textAnim.targetT) state.textAnim = null;
+  else textAnim.t += dt;
+  state.cursor.t = 0;
+  draw();
 }
 
 //------------------------------------------------------------------------------
@@ -297,6 +307,7 @@ function leftRight(dx) {
 
   Object.assign(state.cursor, { i, x, y });
   updateDisplayCursor();
+  state.textAnim = null;
 }
 function upDown(dy) {
   const { text, lines, cursor, displayCursor } = state;
@@ -307,6 +318,7 @@ function upDown(dy) {
 
   Object.assign(state.cursor, { i, x, y });
   state.displayCursor.x = displayX;
+  state.textAnim = null;
 }
 function edit(i0, i1, newStr) {
   let { text } = state;
@@ -319,8 +331,8 @@ function edit(i0, i1, newStr) {
 
   updateText(text);
   Object.assign(state.cursor, { i, x, y });
-  // setTextAnimation(oldStr, newStr);
   updateDisplayCursor();
+  setTextAnimation(oldStr, newStr);
 }
 
 function onKey(e) {
@@ -384,7 +396,7 @@ function onMouseDown(e) {
 
 function draw() {
   updateCamera();
-  const { displayLines, displayCursor, cursor, cam } = state;
+  const { displayLines, displayCursor, cursor, cam, textAnim } = state;
 
   ctx.save();
   ctx.beginPath();
@@ -393,24 +405,28 @@ function draw() {
   ctx.translate(margin, margin);
   ctx.translate(-cam.x * charSize.w, 0);
 
-  const lines = displayLines.slice(cam.y, cam.y + cam.h);
-  ctx.font = `${fontSize}px ${fontFamily}`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  for (const [i, line] of Object.entries(lines)) {
-    const y = i * charSize.h;
-    ctx.fillStyle = fontColor;
-    ctx.fillText(line, 0, y);
-    ctx.fillStyle = delimColor;
-    ctx.fillText(line.replace(new RegExp(`[^${delim}]`, "g"), " "), 0, y);
-  }
-
-  if (cursor.on) {
-    const w = Math.floor(charSize.w * 0.15);
-    const x = Math.floor(displayCursor.x * charSize.w - w / 2);
-    const y = Math.floor((cursor.y - cam.y) * charSize.h);
-    ctx.fillStyle = fontColor;
-    ctx.fillRect(x, y, w, charSize.h);
+  if (textAnim) {
+    // TODO: draw motion text
+  } else {
+    // draw static text
+    const lines = displayLines.slice(cam.y, cam.y + cam.h);
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    for (const [i, line] of Object.entries(lines)) {
+      const y = i * charSize.h;
+      ctx.fillStyle = fontColor;
+      ctx.fillText(line, 0, y);
+      ctx.fillStyle = delimColor;
+      ctx.fillText(line.replace(new RegExp(`[^${delim}]`, "g"), " "), 0, y);
+    }
+    if (cursor.on) {
+      const w = Math.floor(charSize.w * 0.15);
+      const x = Math.floor(displayCursor.x * charSize.w - w / 2);
+      const y = Math.floor((cursor.y - cam.y) * charSize.h);
+      ctx.fillStyle = fontColor;
+      ctx.fillRect(x, y, w, charSize.h);
+    }
   }
   ctx.restore();
 }
@@ -468,8 +484,9 @@ let lastT;
 function tick() {
   const t = window.performance.now();
   if (lastT) {
-    const dt = t - lastT;
-    updateCursorBlink(dt / 1000);
+    const dt = (t - lastT) / 1000;
+    updateTextAnim(dt);
+    updateCursorBlink(dt);
   }
   lastT = t;
   requestAnimationFrame(tick);
