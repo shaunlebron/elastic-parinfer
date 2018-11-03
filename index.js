@@ -175,7 +175,6 @@ function updateText(text, newChar) {
   state.displayLines = displayText.split("\n");
 }
 
-// TODO: when animating, add 1 to width if cell starts with delim
 function setTextAnimation(oldStr, newStr) {
   const { cursor, lines, oldLines, displayLines, oldDisplayLines } = state;
   const oldVals = oldLines.map(line => line.split(delim));
