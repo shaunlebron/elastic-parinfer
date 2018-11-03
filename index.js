@@ -390,9 +390,22 @@ function onMouseDown(e) {
   document.addEventListener("mouseup", onMouseUp);
 }
 
+function tween(a,b,t) {
+  return a + (b-a)*t;
+}
+
 //------------------------------------------------------------------------------
 // Draw
 //------------------------------------------------------------------------------
+
+function drawText(text, x, y) {
+  x *= charSize.w;
+  y *= charSize.h;
+  ctx.fillStyle = fontColor;
+  ctx.fillText(text, x, y);
+  ctx.fillStyle = delimColor;
+  ctx.fillText(text.replace(new RegExp(`[^${delim}]`, "g"), " "), x, y);
+}
 
 function draw() {
   updateCamera();
@@ -405,20 +418,28 @@ function draw() {
   ctx.translate(margin, margin);
   ctx.translate(-cam.x * charSize.w, 0);
 
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
   if (textAnim) {
-    // TODO: draw motion text
+    // draw motion text
+    const { delimVals, oldWidths, newWidths, t, targetT } = textAnim;
+    const numLines = delimVals.length;
+    for (const y of range(numLines)) {
+      let x = 0;
+      const numCells = delimVals[y].length;
+      for (const c of range(numCells)) {
+        const val = delimVals[y][c];
+        drawText(val, x, y);
+        const w = tween(oldWidths[y][c], newWidths[y][c], t / targetT);
+        x += w + (val.startsWith(delim) ? 0 : 1);
+      }
+    }
   } else {
     // draw static text
     const lines = displayLines.slice(cam.y, cam.y + cam.h);
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    for (const [i, line] of Object.entries(lines)) {
-      const y = i * charSize.h;
-      ctx.fillStyle = fontColor;
-      ctx.fillText(line, 0, y);
-      ctx.fillStyle = delimColor;
-      ctx.fillText(line.replace(new RegExp(`[^${delim}]`, "g"), " "), 0, y);
+    for (const [y, line] of Object.entries(lines)) {
+      drawText(line, 0, y);
     }
     if (cursor.on) {
       const w = Math.floor(charSize.w * 0.15);
